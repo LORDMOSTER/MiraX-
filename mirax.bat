@@ -26,6 +26,11 @@ if /i "%usercmd%"=="notepad" goto runnotepad
 if /i "%usercmd%"=="calc" goto runcalc
 if /i "%usercmd%"=="dir" goto rundir
 if /i "%usercmd%"=="changecolor" goto theme
+if /i "%usercmd%"=="newfile" goto newfile
+if /i "%usercmd%"=="writefile" goto writefile
+if /i "%usercmd%"=="readfile" goto readfile
+if /i "%usercmd%"=="delfile" goto delfile
+
 
 echo.
 echo Unknown command: %usercmd%
@@ -45,7 +50,72 @@ echo date     - Show today’s date
 echo notepad  - Open Windows Notepad
 echo calc     - Launch Calculator
 echo dir      - List current directory files
+echo newfile   - Create a new file
+echo writefile - Append text to file
+echo readfile  - Read and display a file
+echo delfile   - Delete a file
+
 echo.
+pause
+goto main
+
+:newfile
+cls
+echo === Create New File ===
+set /p filename=Enter filename (with .txt): 
+if exist "%filename%" (
+    echo File already exists.
+) else (
+    echo.>"%filename%"
+    echo File created: %filename%
+)
+pause
+goto main
+
+:writefile
+cls
+echo === Write to File ===
+set /p filename=Enter filename to write to: 
+if not exist "%filename%" (
+    echo File does not exist.
+    pause
+    goto main
+)
+echo Type your message (type 'EOF' on new line to save):
+:inputloop
+set /p text=
+if /i "%text%"=="EOF" goto donewrite
+echo %text%>>"%filename%"
+goto inputloop
+
+:donewrite
+echo Done writing to %filename%.
+pause
+goto main
+
+:readfile
+cls
+echo === Read a File ===
+set /p filename=Enter filename to read: 
+if not exist "%filename%" (
+    echo File not found!
+) else (
+    echo --- Contents of %filename% ---
+    type "%filename%"
+)
+pause
+goto main
+
+:delfile
+cls
+echo === Delete a File ===
+set /p filename=Enter filename to delete: 
+if exist "%filename%" (
+    del "%filename%"
+    echo Deleted: %filename%
+) else (
+    echo File not found!
+)
 pause
 goto main
 
