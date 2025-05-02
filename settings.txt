@@ -1,0 +1,2 @@
+theme=0d
+welcome=Welcome Buddy
