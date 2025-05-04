@@ -2,6 +2,12 @@
 title MiraX OS - Shell
 color 0D
 
+REM === Load session if exists ===
+if exist session.txt (
+    for /f "tokens=1,* delims==" %%A in (session.txt) do (
+        set "%%A=%%B"
+    )
+)
 REM =========================
 REM USER AUTHENTICATION SECTION
 REM =========================
@@ -13,6 +19,13 @@ if not exist users.txt (
     echo %newuser%:%newpass%>users.txt
     echo Admin account created! Please login.
 )
+REM === Load settings if available ===
+if exist settings.txt (
+    for /f "tokens=1,* delims==" %%A in (settings.txt) do (
+        set "%%A=%%B"
+    )
+)
+goto login
 :login
 cls
 echo ===============================
@@ -23,12 +36,27 @@ set /p upass=Password:
 
 setlocal enabledelayedexpansion
 set "found="
-for /f "tokens=1,2 delims=:" %%A in (users.txt) do (
-    if /i "%%A"=="!uname!" if "%%B"=="!upass!" set found=1
+set "userrole="
+for /f "tokens=1,2,3 delims=:" %%A in (users.txt) do (
+    if /i "%%A"=="!uname!" if "%%B"=="!upass!" (
+        set found=1
+        set userrole=%%C
+    )
 )
-endlocal & set found=%found%
+endlocal & set found=%found% & set userrole=%userrole%
 if defined found (
     echo Login successful! Welcome, %uname%.
+    echo username=%uname%>session.txt
+    echo role=%userrole%>>session.txt
+    echo lastlogin=%date% %time%>>session.txt
+    set username=%uname%
+    set role=%userrole%
+    REM Load user config if exists
+    if exist configs\%uname%.config (
+        for /f "tokens=1,* delims==" %%C in (configs\%uname%.config) do (
+            set "%%C=%%D"
+        )
+    )
     timeout /t 1 >nul
     goto main
 ) else (
@@ -36,28 +64,40 @@ if defined found (
     pause
     goto login
 )
-
 REM =========================
 REM MAIN SECTION
 REM =========================
 :main
 cls
-echo ===============================
-echo         Welcome to MiraX
-echo ===============================
+if defined username (
+    echo Welcome back, %username% 👋
+)
+if defined lastlogin (
+    echo Last login: %lastlogin%
+)
+if defined role (
+    if /i "%role%"=="admin" (
+        color 0C
+    ) else (
+        color 0A
+    )
+)
 echo.
 echo Type a command below:
 echo (Type 'help' for commands)
 echo.
-
-set /p usercmd=mirax%promptSym%$ 
-
+if defined username (
+    set /p usercmd=[%username%@MiraX] ^>
+) else (
+    set /p usercmd=MiraX^>
+)
 REM === Command Handlers ===
 if /i "%usercmd%"=="help" goto help
 if /i "%usercmd%"=="clear" goto clear
 if /i "%usercmd%"=="about" goto about
 if /i "%usercmd%"=="exit" goto end
 if /i "%usercmd%"=="theme" goto colorMenu
+if /i "%usercmd%"=="settings" goto settings
 if /i "%usercmd%"=="time" goto showtime
 if /i "%usercmd%"=="date" goto showdate
 if /i "%usercmd%"=="notepad" goto runnotepad
@@ -117,10 +157,55 @@ REM if /i "%usercmd%"=="ls" goto asciiart
 REM === Theme Preview Command ===
 if /i "%usercmd:~0,13%"=="theme preview" goto themepreview
 
+REM === Command Handlers ===
+if /i "%usercmd%"=="help" goto help
+if /i "%usercmd%"=="clear" goto clear
+if /i "%usercmd%"=="about" goto about
+if /i "%usercmd%"=="exit" goto end
+if /i "%usercmd%"=="theme" goto colorMenu
+if /i "%usercmd%"=="settings" goto settings
+if /i "%usercmd%"=="syshealth" goto syshealth
+if /i "%usercmd%"=="battery" goto battery
+if /i "%usercmd%"=="netstatus" goto netstatus
+if /i "%usercmd%"=="cpuload" goto cpuload
+if /i "%usercmd%"=="ramload" goto ramload
+if /i "%usercmd%"=="diskinfo" goto diskinfo
+if /i "%usercmd%"=="speedtest" goto speedtest
+REM === Command Handlers ===
+if /i "%usercmd%"=="pingtest" goto pingtest
+if /i "%usercmd%"=="ipinfo" goto ipinfo
+if /i "%usercmd%"=="openweb" goto openweb
+if /i "%usercmd%"=="speedtest" goto speedtest
+REM === User Management Commands ===
+if /i "%usercmd%"=="register" goto register
+if /i "%usercmd%"=="login" goto login
+if /i "%usercmd%"=="listusers" goto listusers
+if /i "%usercmd:~0,10%"=="deleteuser" goto deleteuser
+if /i "%usercmd:~0,11%"=="promoteuser" goto promoteuser
+
+REM === User Theme/Prompt Commands ===
+if /i "%usercmd:~0,7%"=="settheme" goto settheme
+if /i "%usercmd:~0,12%"=="settextcolor" goto settextcolor
+if /i "%usercmd%"=="listthemes" goto listthemes
+if /i "%usercmd%"=="previewtheme" goto previewtheme
+if /i "%usercmd%"=="resettheme" goto resettheme
+
+if /i "%usercmd%"=="tasklist" goto tasklist
+if /i "%usercmd:~0,8%"=="killtask" goto killtask
+if /i "%usercmd%"=="sysload" goto sysload
+if /i "%usercmd%"=="processinfo" goto processinfo
+if /i "%usercmd%"=="memstat" goto memstat
+if /i "%usercmd%"=="netstat" goto netstat
+
+
+if /i "%usercmd%"=="whoami" goto whoami
+if /i "%usercmd%"=="logout" goto logout
+
 echo.
 echo Unknown command: %usercmd%
 pause
 goto main
+
 
 :help
 cls
@@ -196,6 +281,89 @@ echo Theme '%themeName%' saved.
 pause
 goto main
 
+:listusers
+if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)
+cls
+echo === Registered Users ===
+for /f "tokens=1,3 delims=:" %%A in (users.txt) do (
+    echo Username: %%A   Role: %%C
+)
+pause
+goto main
+
+:deleteuser
+if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)
+set usertodel=%usercmd:~11%
+if "%usertodel%"=="" (
+    set /p usertodel=Enter username to delete: 
+)
+findstr /i /v "^%usertodel%:" users.txt > users_tmp.txt
+move /y users_tmp.txt users.txt >nul
+echo User '%usertodel%' deleted (if existed).
+pause
+goto main
+
+:promoteuser
+if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)
+set usertopromote=%usercmd:~12%
+REM ... rest of the code ...
+
+set usertopromote=%usercmd:~12%
+if "%usertopromote%"=="" (
+    set /p usertopromote=Enter username to promote: 
+)
+(for /f "tokens=1,2,3 delims=:" %%A in (users.txt) do (
+    if /i "%%A"=="%usertopromote%" (
+        echo %%A:%%B:admin
+    ) else (
+        echo %%A:%%B:%%C
+    )
+)) > users_tmp.txt
+move /y users_tmp.txt users.txt >nul
+echo User '%usertopromote%' promoted to admin (if existed).
+pause
+goto main
+if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)if /i not "%role%"=="admin" (
+    echo Admin access required!
+    pause
+    goto main
+)
 :themeload
 set themeName=%usercmd:~10%
 if "%themeName%"=="" (
@@ -928,6 +1096,22 @@ if "%noteopt%"=="1" goto noteadd
 if "%noteopt%"=="2" goto noteview
 goto main
 
+:register
+cls
+echo === User Registration ===
+set /p reguser=Enter new username: 
+set /p regpass=Enter new password: 
+REM Default role is 'user', unless first user (then admin)
+set role=user
+if not exist users.txt (
+    set role=admin
+)
+REM Simple base64 obfuscation (not secure, but better than plain)
+echo %reguser%:%regpass%:%role%>>users.txt
+echo User '%reguser%' registered as %role%.
+pause
+goto main
+
 :noteadd
 set /p note=Type your note: 
 if not exist notes.txt echo.>notes.txt
@@ -958,5 +1142,504 @@ set /a tsecs=tmin*60
 echo Timer started for %tmin% minutes.
 timeout /t %tsecs% >nul
 echo Timer finished!
+pause
+goto main
+
+REM =========================
+REM SETTINGS SECTION
+REM =========================
+:settings
+cls
+echo === MiraX Settings ===
+echo 1. Change Username
+echo 2. Change Password
+echo 3. Set Default Color Theme
+echo 4. Set Welcome Message
+echo 5. Reset Settings (Factory Defaults)
+echo 6. Back to Main
+set /p setopt=Choose option (1-6): 
+if "%setopt%"=="1" goto set_username
+if "%setopt%"=="2" goto set_password
+if "%setopt%"=="3" goto set_theme
+if "%setopt%"=="4" goto set_welcome
+if "%setopt%"=="5" goto reset_settings
+goto main
+
+:set_username
+set /p newuser=Enter new username: 
+REM Update users.txt (replace old username with new one for current user)
+setlocal enabledelayedexpansion
+set "updated="
+(for /f "tokens=1,2 delims=:" %%A in (users.txt) do (
+    if /i "%%A"=="%uname%" (
+        echo %newuser%:%%B
+        set "updated=1"
+    ) else (
+        echo %%A:%%B
+    )
+)) > users_tmp.txt
+endlocal
+move /y users_tmp.txt users.txt >nul
+set uname=%newuser%
+echo Username changed!
+pause
+goto settings
+
+:set_password
+set /p newpass=Enter new password: 
+setlocal enabledelayedexpansion
+(for /f "tokens=1,2 delims=:" %%A in (users.txt) do (
+    if /i "%%A"=="%uname%" (
+        echo %%A:%newpass%
+    ) else (
+        echo %%A:%%B
+    )
+)) > users_tmp.txt
+endlocal
+move /y users_tmp.txt users.txt >nul
+echo Password changed!
+pause
+goto settings
+
+:set_theme
+echo Choose a color code (e.g., 0D for purple, 0F for white, 3F for aqua, etc.)
+set /p newtheme=Enter color code: 
+set theme=%newtheme%
+REM Save to settings.txt
+call :save_settings
+echo Theme set to %theme%.
+pause
+goto settings
+
+:set_welcome
+set /p welcome=Enter your welcome message: 
+REM Save to settings.txt
+call :save_settings
+echo Welcome message updated!
+pause
+goto settings
+
+:reset_settings
+del settings.txt >nul 2>&1
+set theme=
+set welcome=
+echo Settings reset to factory defaults.
+pause
+goto settings
+
+:save_settings
+REM Save current settings to settings.txt
+(
+    if defined theme echo theme=%theme%
+    if defined welcome echo welcome=%welcome%
+) > settings.txt
+exit /b
+
+REM =========================
+REM SYSTEM HEALTH SECTION
+REM =========================
+:syshealth
+cls
+echo === System Health ===
+REM CPU Usage (simulated)
+for /f "skip=1 tokens=3" %%a in ('wmic cpu get loadpercentage') do (
+    if not "%%a"=="" (
+        set cpu=%%a
+        goto :syshealth_ram
+    )
+)
+:syshealth_ram
+REM RAM Usage
+for /f "tokens=2 delims==" %%a in ('wmic OS get FreePhysicalMemory /value') do (
+    set FreeMem=%%a
+)
+for /f "tokens=2 delims==" %%a in ('wmic OS get TotalVisibleMemorySize /value') do (
+    set TotalMem=%%a
+)
+set /a UsedMem=%TotalMem% - %FreeMem%
+set /a UsedPerc=(%UsedMem%*100)/%TotalMem%
+REM Disk Usage (C:)
+for /f "skip=1 tokens=3" %%a in ('wmic logicaldisk where "DeviceID='C:'" get FreeSpace') do (
+    set FreeDisk=%%a
+    goto :syshealth_disk
+)
+:syshealth_disk
+for /f "skip=1 tokens=3" %%a in ('wmic logicaldisk where "DeviceID='C:'" get Size') do (
+    set TotalDisk=%%a
+    goto :syshealth_show
+)
+:syshealth_show
+set /a UsedDisk=%TotalDisk% - %FreeDisk%
+set /a DiskPerc=(%UsedDisk%*100)/%TotalDisk%
+echo CPU Usage: %cpu%%%
+echo RAM Usage: %UsedPerc%%% (%UsedMem% KB used of %TotalMem% KB)
+echo Disk Usage (C:): %DiskPerc%%% (%UsedDisk% bytes used of %TotalDisk% bytes)
+echo.
+pause
+goto main
+
+:battery
+cls
+echo === Battery Status ===
+wmic path Win32_Battery get EstimatedChargeRemaining,BatteryStatus /format:list 2>nul
+if errorlevel 1 (
+    echo Battery info not available (desktop or unsupported device).
+) else (
+    for /f "tokens=1,2 delims==" %%a in ('wmic path Win32_Battery get EstimatedChargeRemaining,BatteryStatus /value') do (
+        if "%%a"=="EstimatedChargeRemaining" set charge=%%b
+        if "%%a"=="BatteryStatus" set status=%%b
+    )
+    if defined charge (
+        echo Battery: %charge%%%
+        if "%status%"=="2" (
+            echo Status: Charging
+        ) else (
+            echo Status: Discharging
+        )
+    )
+)
+echo.
+pause
+goto main
+
+:netstatus
+cls
+echo === Network Status ===
+ping -n 1 8.8.8.8 | find "TTL=" >nul
+if %errorlevel%==0 (
+    echo Internet: Connected
+) else (
+    echo Internet: Not Connected
+)
+echo.
+pause
+goto main
+
+:cpuload
+cls
+echo === CPU Load (Simulated) ===
+for /f "skip=1 tokens=3" %%a in ('wmic cpu get loadpercentage') do (
+    if not "%%a"=="" (
+        echo Current CPU Load: %%a%%
+        goto cpuload_done
+    )
+)
+:cpuload_done
+pause
+goto main
+
+:ramload
+cls
+echo === RAM Load (Simulated) ===
+for /f "tokens=2 delims==" %%a in ('wmic OS get FreePhysicalMemory /value') do (
+    set FreeMem=%%a
+)
+for /f "tokens=2 delims==" %%a in ('wmic OS get TotalVisibleMemorySize /value') do (
+    set TotalMem=%%a
+)
+set /a UsedMem=%TotalMem% - %FreeMem%
+set /a UsedPerc=(%UsedMem%*100)/%TotalMem%
+echo RAM Usage: %UsedPerc%%% (%UsedMem% KB used of %TotalMem% KB)
+pause
+goto main
+
+:pingtest
+cls
+echo === Ping Test ===
+set /p target=Enter website or domain to ping: 
+ping -n 3 %target%
+if %errorlevel%==0 (
+    echo %target% is reachable!
+) else (
+    echo %target% is NOT reachable.
+)
+pause
+goto main
+
+:ipinfo
+cls
+echo === Public IP Information ===
+where curl >nul 2>nul
+if errorlevel 1 (
+    echo curl is not installed. Please install curl to use this feature.
+) else (
+    echo Fetching public IP and location...
+    curl -s ipinfo.io
+)
+pause
+goto main
+
+:openweb
+cls
+echo === Open Website ===
+set /p weburl=Enter website URL (include http:// or https://): 
+start "" "%weburl%"
+echo Opened %weburl% in your browser.
+pause
+goto main
+
+:tasklist
+cls
+echo === Task List (Simulated) ===
+echo ID   Name         Status      CPU   Mem
+echo 1    explorer.exe Running     02%%  50MB
+echo 2    chrome.exe   Running     10%%  200MB
+echo 3    notepad.exe  Sleeping    00%%  10MB
+echo 4    python.exe   Running     15%%  120MB
+echo 5    svchost.exe  Running     01%%  30MB
+echo.
+pause
+goto main
+
+:killtask
+set taskid=%usercmd:~9%
+if "%taskid%"=="" (
+    set /p taskid=Enter Task ID to kill: 
+)
+REM Simulate killing the task
+echo Attempting to terminate task ID %taskid%...
+REM (In real, use taskkill /PID %taskid% /F)
+echo Task ID %taskid% terminated (simulated).
+pause
+goto main
+
+:sysload
+cls
+echo === System Load (Simulated) ===
+set /a cpu=%random% %% 100
+set /a mem=%random% %% 100
+set barcpu=
+set barmem=
+for /l %%i in (1,1,%cpu%) do set barcpu=!barcpu!#
+for /l %%i in (1,1,%mem%) do set barmem=!barmem!#
+echo CPU: [%cpu%%%] !barcpu!
+echo MEM: [%mem%%%] !barmem!
+pause
+goto main
+
+:processinfo
+set pname=%usercmd:~12%
+if "%pname%"=="" (
+    set /p pname=Enter process name: 
+)
+REM Simulate process info
+if /i "%pname%"=="explorer.exe" (
+    echo Name: explorer.exe
+    echo Status: Running
+    echo ID: 1
+    echo CPU: 02%%
+    echo Mem: 50MB
+) else if /i "%pname%"=="chrome.exe" (
+    echo Name: chrome.exe
+    echo Status: Running
+    echo ID: 2
+    echo CPU: 10%%
+    echo Mem: 200MB
+) else (
+    echo Process '%pname%' not found (simulated).
+)
+pause
+goto main
+
+:memstat
+cls
+echo === Memory Status (Simulated) ===
+set total=4096
+set used=%random%
+set /a used=used %% 4096
+set /a avail=total-used
+echo Total: %total% MB
+echo Used : %used% MB
+echo Free : %avail% MB
+pause
+goto main
+
+:netstat
+cls
+echo === Network Status ===
+ping -n 1 8.8.8.8 | find "TTL=" >nul
+if %errorlevel%==0 (
+    echo Internet: Connected
+) else (
+    echo Internet: Not Connected
+)
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+    echo IP Address:%%a
+)
+pause
+goto main
+
+:diskinfo
+cls
+echo === Disk Info ===
+for /f "skip=1 tokens=1,3" %%a in ('wmic logicaldisk get DeviceID,FreeSpace') do (
+    if not "%%a"=="" (
+        set drive=%%a
+        set free=%%b
+        echo Drive %%a: Free Space = %%b bytes
+    )
+)
+echo.
+pause
+goto main
+:speedtest
+cls
+echo === Internet Speed Test ===
+echo Opening fast.com in your browser...
+start "" "https://fast.com"
+pause
+goto main
+:set_theme
+echo Choose a color code (e.g., 0D for purple, 0F for white, 3F for aqua, etc.)
+set /p newtheme=Enter color code: 
+set theme=%newtheme%
+REM Save to settings.txt
+call :save_settings
+REM Save to session.txt
+if exist session.txt (
+    for /f "tokens=1,* delims==" %%A in (session.txt) do (
+        if /i "%%A"=="theme" (set foundtheme=1)
+    )
+)
+if defined foundtheme (
+    (for /f "tokens=1,* delims==" %%A in (session.txt) do (
+        if /i "%%A"=="theme" (
+            echo theme=%theme%
+        ) else (
+            echo %%A=%%B
+        )
+    )) > session_tmp.txt
+    move /y session_tmp.txt session.txt >nul
+) else (
+    echo theme=%theme%>>session.txt
+)
+echo Theme set to %theme%.
+pause
+goto settings
+:diskinfo
+cls
+echo === Disk Info ===
+for /f "skip=1 tokens=1,3" %%a in ('wmic logicaldisk get DeviceID,FreeSpace') do (
+    if not "%%a"=="" (
+        set drive=%%a
+        set free=%%b
+        echo Drive %%a: Free Space = %%b bytes
+    )
+)
+echo.
+pause
+goto main
+
+:speedtest
+cls
+echo === Internet Speed Test ===
+echo This feature requires 'speedtest.exe' in the MiraX folder.
+if exist speedtest.exe (
+    speedtest.exe
+) else (
+    echo Please download speedtest.exe from https://www.speedtest.net/apps/cli and place it here.
+)
+pause
+goto main
+
+:whoami
+cls
+if defined username (
+    echo You are logged in as: %username%
+) else (
+    echo No user session found.
+)
+pause
+goto main
+
+:logout
+cls
+echo Logging out...
+del session.txt >nul 2>&1
+timeout /t 1 >nul
+goto auth
+:settheme
+set themeName=%usercmd:~8%
+if "%themeName%"=="" (
+    echo Usage: settheme [default|dark|neon|retro|hacker]
+    pause
+    goto main
+)
+set theme=%themeName%
+REM Simulate theme with color codes
+if /i "%themeName%"=="default" set textcolor=0F
+if /i "%themeName%"=="dark" set textcolor=07
+if /i "%themeName%"=="neon" set textcolor=0B
+if /i "%themeName%"=="retro" set textcolor=2E
+if /i "%themeName%"=="hacker" set textcolor=0A
+REM Save to user config
+if not exist configs mkdir configs
+(
+    echo theme=%theme%
+    echo textcolor=%textcolor%
+    echo lastlogin=%date% %time%
+    echo role=%role%
+) > configs\%username%.config
+echo Theme set to %theme%. Welcome to the %theme% mode!
+pause
+goto main
+
+:settextcolor
+set colorval=%usercmd:~13%
+if "%colorval%"=="" (
+    echo Usage: settextcolor [color code, e.g., 0A for green]
+    pause
+    goto main
+)
+set textcolor=%colorval%
+if not exist configs mkdir configs
+(
+    if defined theme echo theme=%theme%
+    echo textcolor=%textcolor%
+    echo lastlogin=%date% %time%
+    echo role=%role%
+) > configs\%username%.config
+echo Text color set to %textcolor%.
+pause
+goto main
+
+:listthemes
+echo === Available Themes ===
+echo default
+echo dark
+echo neon
+echo retro
+echo hacker
+pause
+goto main
+
+:previewtheme
+set themeName=%usercmd:~13%
+if "%themeName%"=="" (
+    echo Usage: previewtheme [theme]
+    pause
+    goto main
+)
+if /i "%themeName%"=="default" color 0F
+if /i "%themeName%"=="dark" color 07
+if /i "%themeName%"=="neon" color 0B
+if /i "%themeName%"=="retro" color 2E
+if /i "%themeName%"=="hacker" color 0A
+echo Previewing theme '%themeName%'. Press any key to revert.
+pause
+color 0D
+goto main
+
+:resettheme
+set theme=default
+set textcolor=0F
+if not exist configs mkdir configs
+(
+    echo theme=default
+    echo textcolor=0F
+    echo lastlogin=%date% %time%
+    echo role=%role%
+) > configs\%username%.config
+echo Theme reset to default.
 pause
 goto main
