@@ -196,8 +196,14 @@ if /i "%usercmd%"=="sysload" goto sysload
 if /i "%usercmd%"=="processinfo" goto processinfo
 if /i "%usercmd%"=="memstat" goto memstat
 if /i "%usercmd%"=="netstat" goto netstat
+if /i "%role%"=="guest" (
+    echo Guests cannot delete files.
+    pause
+    goto main
+)
 
-
+if /i "%usercmd:~0,6%"=="setperm" goto setperm
+if /i "%usercmd%"=="guest" goto guest
 if /i "%usercmd%"=="whoami" goto whoami
 if /i "%usercmd%"=="logout" goto logout
 
@@ -278,6 +284,81 @@ if not exist themes (
 REM Save current color to theme file
 echo %color% > themes\%themeName%.txt
 echo Theme '%themeName%' saved.
+pause
+goto main
+
+:guest
+set username=guest
+set role=guest
+set lastlogin=%date% %time%
+echo Guest mode enabled. Limited access.
+timeout /t 1 >nul
+goto main
+
+:setperm
+set args=%usercmd:~8%
+for /f "tokens=1,2,3" %%a in ("%args%") do (
+    set fname=%%a
+    set permuser=%%b
+    set perm=%%c
+)
+if "%fname%"=="" (
+    set /p fname=Enter filename: 
+)
+if "%permuser%"=="" (
+    set /p permuser=Enter username (or 'all'): 
+)
+if "%perm%"=="" (
+    set /p perm=Enter permission (readonly/edit/restricted): 
+)
+REM Remove old permission for this file/user
+if exist permissions.txt (
+    findstr /v /i "^%fname%:%permuser%:" permissions.txt > permissions_tmp.txt
+    move /y permissions_tmp.txt permissions.txt >nul
+)
+echo %fname%:%permuser%:%perm%>>permissions.txt
+echo Permission set: %fname% for %permuser% as %perm%
+pause
+goto main
+
+REM Example for :writefile
+:writefile
+cls
+echo === Write to File ===
+set /p filename=Enter filename to write to: 
+REM Permission check
+set allowed=1
+if exist permissions.txt (
+    for /f "tokens=1,2,3 delims=:" %%a in (permissions.txt) do (
+        if /i "%%a"=="%filename%" if /i "%%b"=="%username%" (
+            if /i "%%c"=="readonly" set allowed=0
+            if /i "%%c"=="restricted" set allowed=0
+        )
+        if /i "%%a"=="%filename%" if /i "%%b"=="all" (
+            if /i "%%c"=="readonly" set allowed=0
+            if /i "%%c"=="restricted" set allowed=0
+        )
+    )
+)
+if "%allowed%"=="0" (
+    echo You do not have permission to write to this file.
+    pause
+    goto main
+)
+if not exist "%filename%" (
+    echo File does not exist.
+    pause
+    goto main
+)
+echo Type your message (type 'EOF' on new line to save):
+:inputloop
+set /p text=
+if /i "%text%"=="EOF" goto donewrite
+echo %text%>>"%filename%"
+goto inputloop
+
+:donewrite
+echo Done writing to %filename%.
 pause
 goto main
 
@@ -1546,6 +1627,12 @@ goto main
 cls
 if defined username (
     echo You are logged in as: %username%
+    echo Role: %role%
+    if exist configs\%username%.config (
+        for /f "tokens=1,* delims==" %%A in (configs\%username%.config) do (
+            echo %%A: %%B
+        )
+    )
 ) else (
     echo No user session found.
 )
