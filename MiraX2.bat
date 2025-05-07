@@ -189,6 +189,11 @@ if /i "%usercmd%"=="sysload" goto sysload
 if /i "%usercmd%"=="processinfo" goto processinfo
 if /i "%usercmd%"=="memstat" goto memstat
 if /i "%usercmd%"=="netstat" goto netstat
+if /i "%usercmd:~0,8%"=="starttask" goto starttask
+if /i "%usercmd%"=="tasklist" goto tasklist
+if /i "%usercmd:~0,8%"=="killtask" goto killtask
+if /i "%usercmd:~0,8%"=="taskinfo" goto taskinfo
+if /i "%usercmd:~0,6%"=="uptask" goto uptask
 
 if /i "%role%"=="guest" (
     echo Guests cannot delete files.
@@ -3119,7 +3124,99 @@ echo Previewing theme '%themeName%'. Press any key to revert.
 pause
 color 0D
 goto main
+:starttask
+set taskname=%usercmd:~9%
+if "%taskname%"=="" (
+    set /p taskname=Enter task name: 
+)
+REM Generate a random PID (1000-9999)
+set /a pid=%random% %% 9000 + 1000
+set status=Running
+set /a cpu=%random% %% 100
+set /a mem=%random% %% 200 + 20
+set starttime=%time%
+REM Save: PID:TaskName:Status:CPU:MEM:StartTime
+echo %pid%:%taskname%:%status%:%cpu%:%mem%:%starttime%>>processes.txt
+echo Started task '%taskname%' with PID %pid%.
+pause
+goto main
 
+:tasklist
+cls
+echo === Active Tasks ===
+if not exist processes.txt (
+    echo No running tasks.
+    pause
+    goto main
+)
+echo PID   Name             Status     CPU   MEM   StartTime
+for /f "tokens=1-6 delims=:" %%a in (processes.txt) do (
+    echo %%a   %%b   %%c   %%d%%   %%e MB   %%f
+)
+pause
+goto main
+
+:killtask
+set pid=%usercmd:~9%
+if "%pid%"=="" (
+    set /p pid=Enter PID to kill: 
+)
+if not exist processes.txt (
+    echo No running tasks.
+    pause
+    goto main
+)
+findstr /v /b "%pid%:" processes.txt > processes_tmp.txt
+move /y processes_tmp.txt processes.txt >nul
+echo Task with PID %pid% terminated (simulated).
+pause
+goto main
+
+:taskinfo
+set pid=%usercmd:~9%
+if "%pid%"=="" (
+    set /p pid=Enter PID to view info: 
+)
+set found=0
+for /f "tokens=1-6 delims=:" %%a in (processes.txt) do (
+    if "%%a"=="%pid%" (
+        echo === Task Info ===
+        echo PID      : %%a
+        echo Name     : %%b
+        echo Status   : %%c
+        echo CPU      : %%d%%
+        echo Memory   : %%e MB
+        echo Started  : %%f
+        set found=1
+    )
+)
+if "%found%"=="0" (
+    echo No such process with PID %pid%.
+)
+pause
+goto main
+
+:uptask
+set pid=%usercmd:~7%
+if "%pid%"=="" (
+    set /p pid=Enter PID to check uptime: 
+)
+set found=0
+for /f "tokens=1-6 delims=:" %%a in (processes.txt) do (
+    if "%%a"=="%pid%" (
+        echo PID: %%a
+        echo Name: %%b
+        echo Started at: %%f
+        REM Simulate uptime (not real, just for demo)
+        echo Uptime: [Simulated: %random% seconds]
+        set found=1
+    )
+)
+if "%found%"=="0" (
+    echo No such process with PID %pid%.
+)
+pause
+goto main
 :resettheme
 set theme=default
 set textcolor=0F
