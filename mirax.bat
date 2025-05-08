@@ -10,7 +10,7 @@ if exist session.txt (
 )
 REM =========================
 REM USER AUTHENTICATION SECTION
-REM =========================
+REM ========================
 :auth
 
 if not exist users.txt (
