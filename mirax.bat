@@ -17,7 +17,7 @@ if not exist users.txt (
     echo No users found. Let's create your admin account.
     set /p newuser=Enter new username: 
     set /p newpass=Enter new password: 
-    echo %newuser%:%newpass%>users.tx
+    echo %newuser%:%newpass%>users.txt
     echo Admin account created! Please login.
 )
 REM === Load settings if available ===
