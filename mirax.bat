@@ -11,7 +11,7 @@ if exist session.txt (
 REM =========================
 REM USER AUTHENTICATION SECTION
 REM =========================
-:auth
+:aut
 if not exist users.txt (
     echo No users found. Let's create your admin account.
     set /p newuser=Enter new username: 
