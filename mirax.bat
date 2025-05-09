@@ -5,7 +5,8 @@ color 0D
 REM === Load session if exists ===
 if exist session.txt (
     for /f "tokens=1,* delims==" %%A in (session.txt) do (
-        set "%%A=%%B"s
+        set "%%A=%%B"
+
     )
 )
 REM =========================
