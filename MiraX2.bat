@@ -1,7 +1,8 @@
 @echo off
 title MiraX OS - Shell
 color 0D
-
+set "dirhistory=%cd%"
+set "dirpos=1"
 REM === Load session if exists ===
 if exist session.txt (
     for /f "tokens=1,* delims==" %%A in (session.txt) do (
@@ -76,6 +77,8 @@ REM MAIN SECTION
 REM =========================
 :main
 cls
+REM === System Logging: Log the command ===
+
 echo ===============================
 echo         MiraX OS Main Menu
 echo ===============================
@@ -123,6 +126,12 @@ if /i "% usercmd%"=="fileinfo" goto fileinfo
 if /i "%usercmd%"=="encryptfile" goto encryptfile
 if /i "%usercmd%"=="decryptfile" goto decryptfile
 
+if /i "%usercmd:~0,10%"=="searchfile" goto searchfile
+if /i "%usercmd:~0,8%"=="findtext" goto findtext
+if /i "%usercmd%"=="history" goto history
+if /i "%usercmd%"=="goback" goto goback
+if /i "%usercmd%"=="viewsearchlogs" goto viewsearchlogs
+
 REM === New Features ===
 if /i "%usercmd%"=="todo" goto todo
 if /i "%usercmd%"=="reminder" goto reminder
@@ -152,6 +161,11 @@ if /i "%usercmd%"=="ascii" goto asciiart
 
 REM === Theme Preview Command ===
 if /i "%usercmd:~0,13%"=="theme preview" goto themepreview
+
+if /i "%usercmd:~0,10%"=="searchfile" goto searchfile
+if /i "%usercmd:~0,8%"=="findtext" goto findtext
+if /i "%usercmd%"=="history" goto history
+if /i "%usercmd%"=="goback" goto goback
 
 REM === Command Handlers ===
 if /i "%usercmd%"=="help" goto help
@@ -194,6 +208,9 @@ if /i "%usercmd%"=="tasklist" goto tasklist
 if /i "%usercmd:~0,8%"=="killtask" goto killtask
 if /i "%usercmd:~0,8%"=="taskinfo" goto taskinfo
 if /i "%usercmd:~0,6%"=="uptask" goto uptask
+if /i "%usercmd%"=="helpdesk" goto helpdesk
+if /i "%usercmd:~0,4%"=="man " goto manpage
+if /i "%usercmd%"=="viewlogs" goto viewlogs
 
 if /i "%role%"=="guest" (
     echo Guests cannot delete files.
@@ -224,7 +241,7 @@ echo date     - Show today’s date
 echo notepad  - Open Windows Notepad
 echo calc     - Launch Calculator
 echo dir      - List current directory files
-echo newfile  - Create a new file
+echo newfile   - Create a new file
 echo writefile - Append text to file
 echo readfile  - Read and display a file
 echo delfile   - Delete a file
@@ -235,22 +252,28 @@ echo randomnum - Generate a random number
 echo countdown - Countdown timer
 echo flipcoin  - Flip a coin
 echo uptime    - Show system uptime
-echo ls        - List files and folders
-echo cd        - Change directory
-echo mkdir     - Create a new folder
-echo movefile  - Move or rename a file
-echo copyfile  - Copy a file
-echo exists    - Check if file/folder exists
-echo filesize  - Show file size
-echo fileinfo  - Show file info
+echo ls         - List files and folders
+echo cd         - Change directory
+echo mkdir      - Create a new folder
+echo movefile   - Move or rename a file
+echo copyfile   - Copy a file
+echo exists     - Check if file/folder exists
+echo filesize   - Show file size
+echo fileinfo   - Show file info
 echo encryptfile - Encrypt a text file
 echo decryptfile - Decrypt a text file
+
+echo searchfile [name]    - Search for a file by name
+echo findtext [text]      - Search for text inside .txt files
+echo history              - Show directory navigation history
+echo goback               - Return to previous directory
+echo viewsearchlogs       - View search command logs
 
 echo theme save [name]   - Save current theme
 echo theme load [name]   - Load a theme
 echo theme list          - List all themes
 echo theme delete [name] - Delete a theme
-echo theme preview [name] - Preview a theme
+echo theme preview [name]- Preview a theme
 echo banner set [name]   - Set welcome banner
 echo banner show         - Show current banner
 echo banner off          - Disable banner
@@ -263,7 +286,6 @@ echo ascii               - Show cool ASCII art
 echo.
 pause
 goto main
-
 REM =========================
 REM THEME MANAGER SECTION
 REM =========================
@@ -581,7 +603,10 @@ echo === Change Directory ===
 echo Current: %cd%
 set /p newdir=Enter path to change to: 
 if exist "%newdir%\" (
+    set "prevdir=%cd%"
     cd /d "%newdir%"
+    set /a dirpos+=1
+    set "dirhistory=%dirhistory%|%cd%"
     echo Changed to: %cd%
 ) else (
     echo Directory not found!
@@ -3230,4 +3255,205 @@ if not exist configs mkdir configs
 echo Theme reset to default.
 pause
 goto main
+:helpdesk
+cls
+echo ===============================
+echo         MiraX HelpDesk
+echo ===============================
+echo.
+echo [File Operations]
+echo   newfile, writefile, readfile, delfile, movefile, copyfile, exists, filesize, fileinfo
+echo.
+echo [System Tools]
+echo   sysinfo, syshealth, battery, netstatus, cpuload, ramload, diskinfo, speedtest, pingtest, ipinfo, openweb, uptime, processinfo, memstat, netstat
+echo.
+echo [Productivity]
+echo   todo, notes, reminder, timer, calendar, notepad, calc
+echo.
+echo [Advanced / Experimental]
+echo   setperm, encryptfile, decryptfile, theme save/load/list/delete/preview, banner set/show/off/list, prompt set/color/reset, ascii, guest, register, login, listusers, deleteuser, promoteuser, starttask, tasklist, killtask, taskinfo, uptask
+echo.
+echo [Quick Tips]
+echo   Type 'man <command>' for details on any command.
+echo   Example: man tasklist
+echo.
+pause
+goto main
+:manpage
+set mancmd=%usercmd:~4%
+cls
+if /i "%mancmd%"=="tasklist" (
+    echo === Manual: tasklist ===
+    echo Description: Lists all active simulated tasks/processes.
+    echo Syntax:      tasklist
+    echo Example:     tasklist
+    echo.
+    echo Shows PID, name, status, CPU, MEM, and start time for each task.
+    pause
+    goto main
+)
+if /i "%mancmd%"=="starttask" (
+    echo === Manual: starttask ===
+    echo Description: Starts a new simulated process/task.
+    echo Syntax:      starttask ^<taskname^>
+    echo Example:     starttask backup_script
+    echo.
+    echo Adds a new entry to the process list with a unique PID.
+    pause
+    goto main
+)
+if /i "%mancmd%"=="killtask" (
+    echo === Manual: killtask ===
+    echo Description: Terminates a simulated process by PID.
+    echo Syntax:      killtask ^<pid^>
+    echo Example:     killtask 1234
+    echo.
+    echo Removes the process from the process list.
+    pause
+    goto main
+)
+if /i "%mancmd%"=="taskinfo" (
+    echo === Manual: taskinfo ===
+    echo Description: Shows details for a simulated process by PID.
+    echo Syntax:      taskinfo ^<pid^>
+    echo Example:     taskinfo 1234
+    echo.
+    echo Displays all info for the given PID.
+    pause
+    goto main
+)
+if /i "%mancmd%"=="uptask" (
+    echo === Manual: uptask ===
+    echo Description: Shows simulated uptime for a process by PID.
+    echo Syntax:      uptask ^<pid^>
+    echo Example:     uptask 1234
+    echo.
+    echo Displays the start time and a simulated uptime.
+    pause
+    goto main
+)
+REM Add more man pages as needed
+echo No manual entry for '%mancmd%'.
+pause
+goto main
+:viewlogs
+cls
+echo ===============================
+echo         MiraX System Logs
+echo ===============================
+if not exist system_logs.txt (
+    echo No logs found.
+    pause
+    goto main
+)
+for /f "tokens=1,2,3* delims=|" %%a in (system_logs.txt) do (
+    setlocal enabledelayedexpansion
+    set "result=%%d"
+    if /i "!result!"==" Success" (
+        echo [SUCCESS] %%a |%%b|%%c
+    ) else (
+        echo [ERROR]   %%a |%%b|%%c
+    )
+    endlocal
+)
+echo.
+pause
+goto main
 
+:history
+cls
+echo === Directory History ===
+setlocal enabledelayedexpansion
+set idx=1
+for %%D in (%dirhistory::= % ) do (
+    echo !idx!. %%D
+    set /a idx+=1
+)
+endlocal
+pause
+goto main
+
+:goback
+setlocal enabledelayedexpansion
+REM Split dirhistory by | and go to previous
+set "hist=%dirhistory%"
+set "lastdir="
+for %%D in (!hist:^|= !) do (
+    set "lastdir=!currdir!"
+    set "currdir=%%D"
+)
+if defined lastdir (
+    cd /d "!lastdir!"
+    REM Remove last entry
+    set "dirhistory="
+    set idx=1
+    for %%D in (!hist:^|= !) do (
+        if !idx! lss %dirpos% (
+            set "dirhistory=!dirhistory!!sep!%%D"
+            set sep=|
+        )
+        set /a idx+=1
+    )
+    set /a dirpos-=1
+    echo Returned to: !lastdir!
+) else (
+    echo No previous directory in history.
+)
+endlocal
+pause
+goto main
+
+:searchfile
+set searchname=%usercmd:~11%
+if "%searchname%"=="" (
+    set /p searchname=Enter filename to search: 
+)
+cls
+echo === Searching for "%searchname%" ===
+set found=0
+for /f "delims=" %%F in ('dir /b /s "%searchname%" 2^>nul') do (
+    echo Found: %%F
+    set found=1
+)
+if "%found%"=="0" (
+    echo File not found.
+)
+REM Log the search
+echo [%date% %time%] SEARCHFILE "%searchname%" Result: %found%>>search_logs.txt
+pause
+goto main
+
+:findtext
+set searchtext=%usercmd:~9%
+if "%searchtext%"=="" (
+    set /p searchtext=Enter text to search for: 
+)
+cls
+echo === Searching for "%searchtext%" in files ===
+set found=0
+for /f "delims=" %%F in ('dir /b /s *.txt 2^>nul') do (
+    for /f "delims=" %%L in ('findstr /n /i /c:"%searchtext%" "%%F" 2^>nul') do (
+        echo File: %%F
+        echo   %%L
+        set found=1
+    )
+)
+if "%found%"=="0" (
+    echo No matches found.
+)
+REM Log the search
+echo [%date% %time%] FINDTEXT "%searchtext%" Result: %found%>>search_logs.txt
+pause
+goto main
+
+:viewsearchlogs
+cls
+echo === Search Logs ===
+if not exist search_logs.txt (
+    echo No search logs found.
+    pause
+    goto main
+)
+type search_logs.txt
+pause
+goto main
