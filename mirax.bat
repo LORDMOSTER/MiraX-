@@ -9,7 +9,7 @@ if exist session.txt (
 
     )
 )
-REM =========================s
+REM =========================
 REM USER AUTHENTICATION SECTION
 REM =========================
 :auth
