@@ -125,12 +125,19 @@ if /i "%usercmd%"=="filesize" goto filesize
 if /i "% usercmd%"=="fileinfo" goto fileinfo
 if /i "%usercmd%"=="encryptfile" goto encryptfile
 if /i "%usercmd%"=="decryptfile" goto decryptfile
+REM === Pipe-like Chaining (Simulated Pipes) ===
+echo %usercmd% | findstr /r /c:"^.*|.*$" >nul
+if not errorlevel 1 goto pipechain
 
 if /i "%usercmd:~0,10%"=="searchfile" goto searchfile
 if /i "%usercmd:~0,8%"=="findtext" goto findtext
 if /i "%usercmd%"=="history" goto history
 if /i "%usercmd%"=="goback" goto goback
 if /i "%usercmd%"=="viewsearchlogs" goto viewsearchlogs
+if /i "%usercmd:~0,5%"=="runbg" goto runbg
+if /i "%usercmd%"=="jobs" goto jobs
+if /i "%usercmd:~0,7%"=="killjob" goto killjob
+if /i "%usercmd%"=="clearjobs" goto clearjobs
 
 REM === New Features ===
 if /i "%usercmd%"=="todo" goto todo
@@ -3455,5 +3462,115 @@ if not exist search_logs.txt (
     goto main
 )
 type search_logs.txt
+pause
+goto main
+
+:pipechain
+REM Simulate pipes: command1 | command2
+for /f "tokens=1,* delims=|" %%a in ("%usercmd%") do (
+    set "cmd1=%%a"
+    set "cmd2=%%b"
+)
+REM Trim spaces
+for /f "tokens=* delims= " %%a in ("%cmd1%") do set "cmd1=%%a"
+for /f "tokens=* delims= " %%a in ("%cmd2%") do set "cmd2=%%a"
+REM Run first command, save output to temp file
+call :runpipecmd "%cmd1%" > pipe_tmp.txt
+REM Set input for second command
+set "PIPE_INPUT=pipe_tmp.txt"
+call :runpipecmd "%cmd2%"
+set "PIPE_INPUT="
+del pipe_tmp.txt >nul 2>&1
+goto main
+
+:runpipecmd
+REM Handles a single command for piping
+setlocal
+set "cmd=%~1"
+REM Special handling for savefile
+echo %cmd% | findstr /i /c:"savefile " >nul
+if not errorlevel 1 (
+    for /f "tokens=2 delims= " %%f in ("%cmd%") do (
+        copy "%PIPE_INPUT%" "%%f" >nul
+        echo Output saved to %%f
+    )
+    endlocal & exit /b
+)
+REM For findtext, searchfile, etc.
+if /i "%cmd:~0,8%"=="findtext" (
+    set searchtext=%cmd:~9%
+    if "%searchtext%"=="" set /p searchtext=Enter text to search for: 
+    for /f "delims=" %%F in ('dir /b /s *.txt 2^>nul') do (
+        for /f "delims=" %%L in ('findstr /n /i /c:"%searchtext%" "%%F" 2^>nul') do (
+            echo File: %%F
+            echo   %%L
+        )
+    )
+    endlocal & exit /b
+)
+if /i "%cmd:~0,10%"=="searchfile" (
+    set searchname=%cmd:~11%
+    if "%searchname%"=="" set /p searchname=Enter filename to search: 
+    for /f "delims=" %%F in ('dir /b /s "%searchname%" 2^>nul') do (
+        echo Found: %%F
+    )
+    endlocal & exit /b
+)
+REM Default: try to call as a batch label
+call :%cmd%
+endlocal & exit /b
+
+:runbg
+set bgcmd=%usercmd:~6%
+if "%bgcmd%"=="" (
+    set /p bgcmd=Enter command to run in background: 
+)
+set /a bgpid=%random%+1000
+start "" /B cmd /c "%bgcmd% > bgjob_%bgpid%.log 2>&1 & echo [%%date%% %%time%%] %bgcmd% (PID %bgpid%) >> bgjobs.log"
+echo Started background job [%bgpid%]: %bgcmd%
+echo %bgpid%|%bgcmd%|Running|%date% %time%>>bgjobs.txt
+pause
+goto main
+
+:jobs
+cls
+echo === Background Jobs ===
+if not exist bgjobs.txt (
+    echo No background jobs found.
+    pause
+    goto main
+)
+echo PID     Command                Status      Started
+for /f "tokens=1-4 delims=|" %%a in (bgjobs.txt) do (
+    echo %%a     %%b     %%c     %%d
+)
+pause
+goto main
+
+:killjob
+set jobid=%usercmd:~8%
+if "%jobid%"=="" (
+    set /p jobid=Enter PID to kill: 
+)
+REM Try to kill by PID
+taskkill /PID %jobid% /F >nul 2>&1
+REM Mark as killed in bgjobs.txt
+(for /f "tokens=1-4 delims=|" %%a in (bgjobs.txt) do (
+    if "%%a"=="%jobid%" (
+        echo %%a|%%b|Killed|%%d
+    ) else (
+        echo %%a|%%b|%%c|%%d
+    )
+)) > bgjobs_tmp.txt
+move /y bgjobs_tmp.txt bgjobs.txt >nul
+echo Job %jobid% killed (if running).
+pause
+goto main
+
+:clearjobs
+if exist bgjobs.txt del bgjobs.txt
+if exist bgjobs.log del bgjobs.log
+for %%f in (bgjob_*.log) do del "%%f"
+echo All background job logs cleared.
 pause
 goto main
