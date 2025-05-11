@@ -129,6 +129,15 @@ REM === Pipe-like Chaining (Simulated Pipes) ===
 echo %usercmd% | findstr /r /c:"^.*|.*$" >nul
 if not errorlevel 1 goto pipechain
 
+REM === Theme & Accessibility Features ===
+if /i "%usercmd:~0,6%"=="theme " goto themecolor
+if /i "%usercmd%"=="highcontrast" goto highcontrast
+if /i "%usercmd:~0,8%"=="textzoom" goto textzoom
+if /i "%usercmd%"=="narrator" goto narrator
+if /i "%usercmd%"=="beep" goto beep
+if /i "%usercmd:~0,4%"=="say " goto say
+if /i "%usercmd%"=="notify" goto notify
+
 if /i "%usercmd:~0,10%"=="searchfile" goto searchfile
 if /i "%usercmd:~0,8%"=="findtext" goto findtext
 if /i "%usercmd%"=="history" goto history
@@ -2744,12 +2753,14 @@ echo 3. Set Default Color Theme
 echo 4. Set Welcome Message
 echo 5. Reset Settings (Factory Defaults)
 echo 6. Back to Main
+echo 7. Set Welcome Greeting
 set /p setopt=Choose option (1-6): 
 if "%setopt%"=="1" goto set_username
 if "%setopt%"=="2" goto set_password
 if "%setopt%"=="3" goto set_theme
 if "%setopt%"=="4" goto set_welcome
 if "%setopt%"=="5" goto reset_settings
+if "%setopt%"=="7" goto set_greeting
 goto main
 
 :set_username
@@ -3572,5 +3583,90 @@ if exist bgjobs.txt del bgjobs.txt
 if exist bgjobs.log del bgjobs.log
 for %%f in (bgjob_*.log) do del "%%f"
 echo All background job logs cleared.
+pause
+goto main
+:set_greeting
+set /p greet=Enter your welcome greeting: 
+echo %greet%>welcome.txt
+echo Welcome greeting saved!
+pause
+goto settings
+:themecolor
+set themeopt=%usercmd:~6%
+if /i "%themeopt%"=="light" color 0F
+if /i "%themeopt%"=="dark" color 07
+if /i "%themeopt%"=="matrix" color 0A
+if /i "%themeopt%"=="highcontrast" color 0E
+if /i "%themeopt%"=="custom" (
+    set /p customcol=Enter custom color code (e.g., 3F): 
+    color %customcol%
+)
+REM Save preference
+echo theme=%themeopt%>theme.cfg
+echo Theme set to %themeopt%.
+pause
+goto main
+
+REM Load theme preference at startup (add near top of file, after @echo off)
+if exist theme.cfg (
+    for /f "tokens=2 delims==" %%a in (theme.cfg) do (
+        if /i "%%a"=="light" color 0F
+        if /i "%%a"=="dark" color 07
+        if /i "%%a"=="matrix" color 0A
+        if /i "%%a"=="highcontrast" color 0E
+        if /i "%%a"=="custom" (
+            if exist customcolor.cfg (
+                set /p customcol=<customcolor.cfg
+                color !customcol!
+            )
+        )
+    )
+)
+
+:beep
+REM Simple terminal beep
+echo ^G
+pause
+goto main
+
+:say
+set saymsg=%usercmd:~4%
+if "%saymsg%"=="" set /p saymsg=Enter message to speak: 
+powershell -c "Add-Type –AssemblyName System.Speech;$speak = New-Object System.Speech.Synthesis.SpeechSynthesizer;$speak.Speak('%saymsg%')"
+pause
+goto main
+
+:notify
+REM Notification tone (simple beep)
+echo ^G
+timeout /t 1 >nul
+echo ^G
+pause
+goto main
+
+:highcontrast
+color 0E
+echo High contrast mode enabled.
+echo theme=highcontrast>theme.cfg
+pause
+goto main
+
+:textzoom
+set zoomopt=%usercmd:~9%
+if "%zoomopt%"=="+" (
+    powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')"
+    echo Text zoomed in.
+) else if "%zoomopt%"=="-" (
+    powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^{-}')"
+    echo Text zoomed out.
+) else (
+    echo Usage: textzoom +  or  textzoom -
+)
+pause
+goto main
+
+:narrator
+start narrator
+echo Windows Narrator started.
 pause
 goto main
