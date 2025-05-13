@@ -128,6 +128,9 @@ if /i "%usercmd%"=="decryptfile" goto decryptfile
 REM === Pipe-like Chaining (Simulated Pipes) ===
 echo %usercmd% | findstr /r /c:"^.*|.*$" >nul
 if not errorlevel 1 goto pipechain
+REM === Compression/Decompression Commands ===
+if /i "%usercmd:~0,7%"=="zipfile" goto zipfile
+if /i "%usercmd:~0,8%"=="unzipfile" goto unzipfile
 
 REM === Theme & Accessibility Features ===
 if /i "%usercmd:~0,6%"=="theme " goto themecolor
@@ -3591,6 +3594,7 @@ echo %greet%>welcome.txt
 echo Welcome greeting saved!
 pause
 goto settings
+
 :themecolor
 set themeopt=%usercmd:~6%
 if /i "%themeopt%"=="light" color 0F
@@ -3668,5 +3672,96 @@ goto main
 :narrator
 start narrator
 echo Windows Narrator started.
+pause
+goto main
+:zipfile
+setlocal enabledelayedexpansion
+set ziparg=%usercmd:~8%
+if "%ziparg%"=="" (
+    echo Usage: zipfile ^<filename/folder/wildcard^>
+    pause
+    endlocal
+    goto main
+)
+if not exist compressed mkdir compressed
+
+REM Handle wildcards and multiple files
+set zipname=archive
+if not "%ziparg%"=="%ziparg:*?=%" (
+    set zipname=multi
+)
+REM Remove trailing backslash for folders
+if exist "%ziparg%\" (
+    set zipname=%ziparg%
+    set ziparg=%ziparg%\*
+)
+
+REM Handle name conflicts
+set outzip=compressed\%zipname%.zip
+set idx=1
+:zipconflict
+if exist "!outzip!" (
+    set outzip=compressed\%zipname%_!idx!.zip
+    set /a idx+=1
+    goto zipconflict
+)
+
+echo Compressing "%ziparg%" to "!outzip!"...
+powershell -Command "Add-Type -A 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path '%ziparg%').Path, (Resolve-Path '!outzip!').Path)" 2>nul
+
+REM If above fails (not a directory), try as file(s)
+if not exist "!outzip!" (
+    powershell -Command "Add-Type -A 'System.IO.Compression.FileSystem'; $zip = [IO.Compression.ZipFile]::Open('!outzip!', 'Create'); foreach ($f in Get-ChildItem %ziparg%) { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $f.FullName, $f.Name) }; $zip.Dispose()"
+)
+
+REM Show progress and size
+if exist "!outzip!" (
+    for %%I in ("!outzip!") do set size=%%~zI
+    set /a kb=!size!/1024
+    echo Compression complete. Size: !size! bytes (^~!kb! KB)
+) else (
+    echo Compression failed. Check file/folder name.
+)
+endlocal
+pause
+goto main
+
+:unzipfile
+setlocal enabledelayedexpansion
+set zipfile=%usercmd:~9%
+if "%zipfile%"=="" (
+    echo Usage: unzipfile ^<filename.zip^>
+    pause
+    endlocal
+    goto main
+)
+if not exist "%zipfile%" (
+    echo File not found: %zipfile%
+    pause
+    endlocal
+    goto main
+)
+REM Extract to uncompressed\foldername
+set "zipbase=%zipfile:.zip=%"
+set outdir=uncompressed\%zipbase%
+set idx=1
+:unzipconflict
+if exist "!outdir!" (
+    set outdir=uncompressed\%zipbase%_!idx!
+    set /a idx+=1
+    goto unzipconflict
+)
+mkdir "!outdir!"
+echo Extracting "%zipfile%" to "!outdir!"...
+powershell -Command "Add-Type -A 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::ExtractToDirectory('%zipfile%', '!outdir!')"
+REM Show result
+if exist "!outdir!\" (
+    echo Extraction complete.
+    for /f "tokens=*" %%F in ('dir /s /b "!outdir!" ^| find /c /v ""') do set files=%%F
+    echo Files extracted: !files!
+) else (
+    echo Extraction failed.
+)
+endlocal
 pause
 goto main
