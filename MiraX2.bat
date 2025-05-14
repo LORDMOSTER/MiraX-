@@ -131,6 +131,7 @@ if not errorlevel 1 goto pipechain
 REM === Compression/Decompression Commands ===
 if /i "%usercmd:~0,7%"=="zipfile" goto zipfile
 if /i "%usercmd:~0,8%"=="unzipfile" goto unzipfile
+if /i "%usercmd:~0,10%"=="installpkg" goto installpkg
 
 REM === Theme & Accessibility Features ===
 if /i "%usercmd:~0,6%"=="theme " goto themecolor
@@ -3764,4 +3765,41 @@ if exist "!outdir!\" (
 )
 endlocal
 pause
+goto main
+
+:installpkg
+setlocal enabledelayedexpansion
+set toolname=%usercmd:~11%
+if "%toolname%"=="" (
+    echo Usage: installpkg ^<toolname^>
+    pause
+    endlocal
+    goto main
+)
+
+REM Check if the package exists
+if not exist "packages\%toolname%.bat" if not exist "packages\%toolname%.exe" (
+    echo Package '%toolname%' not found in packages folder.
+    pause
+    endlocal
+    goto main
+)
+
+REM Create bin directory if it doesn't exist
+if not exist bin mkdir bin
+
+REM Copy the tool to the bin directory
+if exist "packages\%toolname%.bat" (
+    copy "packages\%toolname%.bat" "bin\%toolname%.bat" >nul
+) else if exist "packages\%toolname%.exe" (
+    copy "packages\%toolname%.exe" "bin\%toolname%.exe" >nul
+)
+
+REM Register the command
+echo %toolname%>>commands.txt
+
+echo Installing %toolname%...
+echo %toolname% installed successfully. You can now use it from the command line.
+pause
+endlocal
 goto main
