@@ -141,6 +141,7 @@ if /i "%usercmd%"=="narrator" goto narrator
 if /i "%usercmd%"=="beep" goto beep
 if /i "%usercmd:~0,4%"=="say " goto say
 if /i "%usercmd%"=="notify" goto notify
+if /i "%usercmd%"=="launchpad" goto launchpad
 
 if /i "%usercmd:~0,10%"=="searchfile" goto searchfile
 if /i "%usercmd:~0,8%"=="findtext" goto findtext
@@ -3803,3 +3804,26 @@ echo %toolname% installed successfully. You can now use it from the command line
 pause
 endlocal
 goto main
+
+:launchpad
+cls
+echo ========== M I R A X   L A U N C H P A D ==========
+echo [1] Notes
+echo [2] To-Do List
+echo [3] Calendar
+echo [4] Timer
+echo [5] Reminder
+echo [6] Settings
+echo [7] Theme Selector
+echo [0] Exit Launchpad
+echo ===================================================
+set /p choice="Enter your choice: "
+if "%choice%"=="1" goto notes
+if "%choice%"=="2" goto todo
+if "%choice%"=="3" goto calendar
+if "%choice%"=="4" goto timer
+if "%choice%"=="5" goto reminder
+if "%choice%"=="6" goto settings
+if "%choice%"=="7" goto settheme
+if "%choice%"=="0" goto main
+goto launchpad
